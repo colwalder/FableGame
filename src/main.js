@@ -251,6 +251,7 @@ class Game {
     this.updateCamera(dt);
     this.ambient(dt, p.pos.x, p.pos.z);
     this.ui.frame(dt);
+    if (inp.hit(KEY.god) && !p.dead && this.state === 'play') { this.god = !this.god; if (this.god) p.restore(); this.ui.toast(this.god ? 'GOD MODE ON' : 'GOD MODE OFF', 2); }
     if (inp.hit(KEY.journal) && !p.dead && this.state === 'play') { this.state = 'journal'; this.ui.openJournal(this.found); }
   }
 
@@ -283,7 +284,7 @@ class Game {
     for (const a of AREAS) if (!this.seenAreas.has(a.id) && a.test(x, z) && !this.boss) { this.seenAreas.add(a.id); this.ui.area(a.title, a.sub); }
     if (!this.templar.dead && !this.templar.active && Math.hypot(x - SQUARE.x, z - SQUARE.z) < SQUARE.r - 3.5) this.startBoss(this.templar);
     if (!this.priest.dead && !this.priest.active && Math.abs(x) < 10 && z < CHURCH.maxZ - 1.2 && z > CHURCH.minZ - 4) this.startBoss(this.priest);
-    if (hunted) { this.combatHold = 3.5; this.hint('fight', 'LMB slash  ·  RMB whirlwind  ·  Space roll  ·  Q lock on'); } else this.combatHold -= dt;
+    if (hunted) { this.combatHold = 3.5; this.hint('fight', 'C slash  ·  X whirlwind  ·  Space roll  ·  Q lock on'); } else this.combatHold -= dt;
     const fighting = this.combatHold > 0 || (this.boss && this.boss.active && !this.boss.dead);
     this.combatLevel = damp(this.combatLevel, fighting ? 1 : 0, 3, dt);
     if (this.stain && !p.dead) {

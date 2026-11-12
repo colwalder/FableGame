@@ -19,8 +19,8 @@ Then open http://localhost:5173 in a desktop browser (Chrome recommended).
 | Move / look | WASD / mouse (arrow keys also turn the camera) | Left / right stick |
 | Sprint | Shift | A (hold) |
 | Roll (i-frames) | Space | B |
-| Light attack (3-hit combo) | LMB or J | RB |
-| Whirlwind (heavy) | RMB or K | RT |
+| Light attack (3-hit combo) | C | RB |
+| Whirlwind (heavy) | X | RT |
 | Lock on | Q or middle mouse | R3 |
 | Drink flask | R | X |
 | Play flute | F | Y |

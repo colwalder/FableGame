@@ -2,8 +2,8 @@
 const PAD_NAMES = ['PadA', 'PadB', 'PadX', 'PadY', 'PadLB', 'PadRB', 'PadLT', 'PadRT', 'PadBack', 'PadStart', 'PadL3', 'PadR3', 'PadUp', 'PadDown', 'PadLeft', 'PadRight'];
 
 export const KEY = {
-  light: ['Mouse0', 'KeyJ', 'PadRB'],
-  heavy: ['Mouse2', 'KeyK', 'PadRT'],
+  light: ['KeyC', 'PadRB'],
+  heavy: ['KeyX', 'PadRT'],
   roll: ['Space', 'PadB'],
   sprint: ['ShiftLeft', 'ShiftRight', 'PadA'],
   flask: ['KeyR', 'PadX'],
@@ -12,6 +12,7 @@ export const KEY = {
   lock: ['KeyQ', 'Mouse1', 'PadR3'],
   journal: ['Tab', 'PadBack'],
   back: ['Escape', 'PadB'],
+  god: ['KeyG'], // dev: toggle invulnerability + infinite stamina
 };
 
 export class Input {

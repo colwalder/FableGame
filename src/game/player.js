@@ -188,6 +188,7 @@ export class Player {
 
     if ((this.stDelay -= dt) <= 0 && regen) this.st = Math.min(this.maxSt, this.st + (this.buff > 0 ? 62 : 42) * dt);
     this.st = Math.max(-25, this.st);
+    if (this.game.god) { this.st = this.maxSt; this.winded = false; }
     if (this.buff > 0 && !this.dead) this.hp = Math.min(this.maxHp, this.hp + 1.2 * dt);
 
     this.pos.x += this.vel.x * dt; this.pos.z += this.vel.z * dt;
