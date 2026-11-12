@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lament of Chernobrod</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;800&family=IM+Fell+English:ital@0;1&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+<script type="importmap">
+{ "imports": { "three": "./vendor/three/three.module.js", "three/addons/": "./vendor/three/addons/" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+
+<div id="hud" class="hidden">
+  <div id="bars">
+    <div class="bar hp"><div class="lag" id="hpLag"></div><div class="fill" id="hpFill"></div></div>
+    <div class="bar st"><div class="fill" id="stFill"></div></div>
+    <div id="buff" class="hidden"><span class="glyph">&#9835;</span><div class="bufftrack"><div id="buffFill"></div></div><span class="bufflabel">Shepherd's Lament</span></div>
+  </div>
+  <div id="belt">
+    <div class="slot"><span class="key">R</span><span class="ico flask"></span><span id="flasks">4</span></div>
+    <div class="slot"><span class="key">F</span><span class="ico flute">&#9835;</span></div>
+    <div class="slot silver"><span class="ico coin"></span><span id="silver">0</span></div>
+  </div>
+  <div id="clueCount">Clues <span id="clueN">0</span>/13 &nbsp;·&nbsp; <span class="key">Tab</span> journal</div>
+  <div id="prompt" class="hidden"></div>
+  <div id="toast"></div>
+  <div id="say"></div>
+  <div id="area"><div id="areaTitle"></div><div id="areaSub"></div></div>
+  <div id="boss" class="hidden"><div id="bossName"></div><div class="bar bossbar"><div class="lag" id="bossLag"></div><div class="fill" id="bossFill"></div></div></div>
+  <div id="lockDot" class="hidden"></div>
+  <div id="banner"><div id="bannerTitle"></div><div id="bannerSub"></div></div>
+</div>
+
+<div id="reader" class="overlay hidden">
+  <div class="parchment">
+    <div class="ptitle" id="readTitle"></div>
+    <div class="pbody" id="readBody"></div>
+    <div class="pnote" id="readNote"></div>
+    <div class="phint">E / Esc — close</div>
+  </div>
+</div>
+
+<div id="journal" class="overlay hidden">
+  <div class="jwrap">
+    <div class="jlist" id="jList"></div>
+    <div class="parchment jpage">
+      <div class="ptitle" id="jTitle">Journal</div>
+      <div class="pbody" id="jBody">What you have found in Chernobrod is recorded here.</div>
+      <div class="pnote" id="jNote"></div>
+      <div class="phint">↑ ↓ browse &nbsp;·&nbsp; Tab / Esc — close</div>
+    </div>
+  </div>
+</div>
+
+<div id="shrine" class="overlay hidden">
+  <div class="shrinebox">
+    <div class="stitle">Wayside Shrine</div>
+    <div class="ssub">The candle catches. The dark steps back a pace.</div>
+    <div class="srow" data-k="vigor"><span class="key">1</span><span class="sname">Vigor</span><span class="sdesc">more life</span><span class="slv" id="lvVigor"></span><span class="scost" id="costVigor"></span></div>
+    <div class="srow" data-k="endurance"><span class="key">2</span><span class="sname">Endurance</span><span class="sdesc">more stamina</span><span class="slv" id="lvEndurance"></span><span class="scost" id="costEndurance"></span></div>
+    <div class="srow" data-k="strength"><span class="key">3</span><span class="sname">Strength</span><span class="sdesc">heavier blows</span><span class="slv" id="lvStrength"></span><span class="scost" id="costStrength"></span></div>
+    <div class="ssilver">Silver: <span id="shrineSilver">0</span></div>
+    <div class="phint">E / Esc — rise</div>
+  </div>
+</div>
+
+<div id="death" class="hidden"><div>THE CURSE TAKES YOU</div></div>
+<div id="fade"></div>
+
+<div id="ending" class="overlay hidden">
+  <div class="endbox">
+    <div class="endkind" id="endKind"></div>
+    <div class="endtitle" id="endTitle"></div>
+    <div class="endbody" id="endBody"></div>
+    <div class="endstats" id="endStats"></div>
+    <button id="endRestart">Walk the road again</button>
+  </div>
+</div>
+
+<div id="title" class="overlay">
+  <div class="titlebox">
+    <div class="tsup">A sellsword's tale</div>
+    <h1>Lament <span>of</span> Chernobrod</h1>
+    <div class="tline"></div>
+    <p class="tintro">A letter. A cursed village. Three hundred grivnas of silver waiting at the altar.<br>You have taken worse work for less.</p>
+    <button id="startBtn">Take the contract</button>
+    <div class="controls">
+      <div><b>WASD</b> move</div><div><b>Mouse</b> look</div><div><b>Shift</b> sprint</div>
+      <div><b>Space</b> roll</div><div><b>LMB / J</b> light attack</div><div><b>RMB / K</b> whirlwind</div>
+      <div><b>Q / MMB</b> lock on</div><div><b>R</b> drink flask</div><div><b>F</b> play flute</div>
+      <div><b>E</b> interact / read</div><div><b>Tab</b> journal</div><div><b>Arrows</b> turn camera</div>
+    </div>
+    <div class="tfoot">Search the village. Not everything worth finding is on the road. Gamepad supported.</div>
+  </div>
+</div>
+
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
