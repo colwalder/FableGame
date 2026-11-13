@@ -32,6 +32,9 @@ past its ring to sprint), the right thumb drags to look, and on-screen buttons c
 strike, whirl, roll, lock, flask, flute and journal. Tap a prompt to read or rest.
 Add `?touch=1` to the URL to try the touch layout on a desktop.
 
+To play on a phone, start the server with `python3 serve.py --lan` and open the
+address it prints on a phone that is on the same Wi-Fi.
+
 ## Notes
 
 - Kindle wayside shrines to set a checkpoint, refill flasks and spend silver on
