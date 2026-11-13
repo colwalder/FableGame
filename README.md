@@ -43,5 +43,6 @@ Then open http://localhost:5173 in a desktop browser (Chrome recommended).
 - `src/world/` — terrain, village construction, story text
 - `src/chars/` — procedural rigs, models and pose library
 - `src/game/` — player, enemies, the two bosses, hazards, HUD
-- `src/audio/` — synthesised SFX and the layered, state-driven score
+- `src/gfx/` — render pipeline (MSAA HDR scene, ambient occlusion, light shafts, bloom, grade) and particles
+- `src/audio/` — synthesised SFX (3D-positioned, two reverb spaces), ambience, and the layered, state-driven score
 - `vendor/three/` — Three.js r170 (MIT)

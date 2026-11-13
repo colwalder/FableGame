@@ -1,15 +1,12 @@
 import * as THREE from 'three';
-import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { Pipeline } from './gfx/post.js';
 import { Input, KEY } from './core/input.js';
 import { AudioSys } from './audio/audio.js';
 import { Music } from './audio/music.js';
+import { Ambience } from './audio/ambience.js';
 import { FX } from './gfx/fx.js';
 import { World } from './world/world.js';
-import { groundHeight, corruption, inChurch, SQUARE, CHURCH, START } from './world/terrain.js';
+import { groundHeight, corruption, inChurch, pathDist, SQUARE, CHURCH, START } from './world/terrain.js';
 import { AREAS } from './world/story.js';
 import { Player } from './game/player.js';
 import { Enemy } from './game/enemies.js';
@@ -18,29 +15,7 @@ import { Hazards } from './game/hazards.js';
 import { UI } from './game/ui.js';
 import { clamp, damp, dampAngle, angDiff, rand } from './core/util.js';
 
-const GradeShader = {
-  uniforms: { tDiffuse: { value: null }, time: { value: 0 }, hurt: { value: 0 }, low: { value: 0 }, desat: { value: 0 }, warm: { value: 0 } },
-  vertexShader: 'varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.); }',
-  fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float time, hurt, low, desat, warm; varying vec2 vUv;
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)) + time) * 43758.5453); }
-    void main(){
-      vec2 d = vUv - .5; float r = length(d);
-      vec2 off = d * r * .006;
-      vec3 c = vec3(texture2D(tDiffuse, vUv + off).r, texture2D(tDiffuse, vUv).g, texture2D(tDiffuse, vUv - off).b);
-      float v = smoothstep(.95, .25, r * 1.08);
-      c *= mix(.42, 1., v);
-      float edge = 1. - smoothstep(.2, .75, r);
-      c = mix(c, vec3(.55, .0, .0), (1. - edge) * clamp(hurt * .9 + low * (.3 + .12 * sin(time * 5.)), 0., .85));
-      float l = dot(c, vec3(.3, .59, .11));
-      c = mix(c, vec3(l) * vec3(1.05, .98, .95), clamp(.12 + desat, 0., 1.));
-      c *= mix(vec3(1.), vec3(1.12, .96, .86), warm);
-      c += (hash(vUv * 700.) - .5) * .028;
-      gl_FragColor = vec4(max(c, 0.), 1.);
-    }`,
-};
-
-const MOON = new THREE.Vector3(-0.45, 0.55, 0.7).normalize();
+const MOON = new THREE.Vector3(-0.45, 0.55, 0.7).normalize(), RIFT = new THREE.Vector3(0, 0.5, -1).normalize();
 const _v = new THREE.Vector3();
 
 class Game {
@@ -53,18 +28,15 @@ class Game {
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.2, 900);
     this.scene.add(new THREE.HemisphereLight(0x7890c4, 0x2a221c, 1.45));
     this.moon = new THREE.DirectionalLight(0xa9bdf0, 2.6); this.moon.castShadow = true;
-    const s = this.moon.shadow; s.mapSize.set(2048, 2048); s.camera.left = s.camera.bottom = -40; s.camera.right = s.camera.top = 40; s.camera.near = 1; s.camera.far = 230; s.bias = -0.0006; s.normalBias = 0.05;
+    const s = this.moon.shadow; s.mapSize.set(4096, 4096); s.camera.left = s.camera.bottom = -40; s.camera.right = s.camera.top = 40; s.camera.near = 1; s.camera.far = 230; s.bias = -0.0006; s.normalBias = 0.05;
     this.scene.add(this.moon, this.moon.target);
     this.fill = new THREE.PointLight(0x93a8d8, 14, 15, 1.5); this.scene.add(this.fill);
 
-    this.composer = new EffectComposer(r);
-    this.composer.addPass(new RenderPass(this.scene, this.camera));
-    this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.7, 0.7, 1.0); this.composer.addPass(this.bloom);
-    this.grade = new ShaderPass(GradeShader); this.composer.addPass(this.grade);
-    this.composer.addPass(new OutputPass());
+    this.post = new Pipeline(r, this.scene, this.camera); this.grade = this.post.grade;
+    this.post.sources.push({ dir: RIFT, strength: 1 }, { dir: MOON, strength: 0.5 });
 
     this.input = new Input(canvas);
-    this.world = new World(this.scene);
+    this.world = new World(this.scene); this.world.bakeEnv(r); this.scene.environmentIntensity = 1.0;
     this.fx = new FX(this.scene);
     this.ui = new UI(this);
     this.haz = new Hazards(this);
@@ -89,12 +61,12 @@ class Game {
 
   resize() {
     const w = innerWidth, h = innerHeight;
-    this.renderer.setSize(w, h, false); this.composer.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.fx.resize(h);
+    this.renderer.setSize(w, h, false); this.post.setSize(w, h); this.camera.aspect = w / h; this.camera.updateProjectionMatrix(); this.fx.resize(h);
   }
 
   start() {
     if (this.state !== 'title') return;
-    this.audio = new AudioSys(); this.audio.resume(); this.music = new Music(this.audio); this.music.setState('explore');
+    this.audio = new AudioSys(); this.audio.resume(); this.music = new Music(this.audio); this.music.setState('explore'); this.amb = new Ambience(this.audio);
     this.ui.hideTitle(); this.ui.showHud(true); this.state = 'play'; this.input.wantLock = true; this.input.lock();
     this.ui.fade(true); setTimeout(() => this.ui.fade(false), 60);
     this.after(1.2, () => this.ui.area(AREAS[0].title, AREAS[0].sub)); this.seenAreas.add('road');
@@ -159,7 +131,7 @@ class Game {
     this.ended = true; this.inputEnabled = false;
     if (kind === 'good') {
       this.bies.banish(); this.bies = null; this.audio.sfx.bell(0.6); this.audio.sfx.buff(); this.music.setState('ending'); this.ui.say('The last note hangs in the ruined church.', 5);
-      this.world.skyMat.uniforms.rift.value = 0; this.world.lights.forEach((l) => { if (l.pulse) l.i *= 0.15; });
+      this.world.skyMat.uniforms.rift.value = 0; this.world.bakeEnv(this.renderer); this.world.lights.forEach((l) => { if (l.pulse) l.i *= 0.15; });
       this.after(6.5, () => this.showEnding('good'));
     } else {
       this.audio.sfx.die(); this.audio.sfx.roar(0.8, 0.5); this.music.setState('doom'); this.hurt = 1; this.shake(1.2); this.player.state = 'rest';
@@ -261,7 +233,21 @@ class Game {
     const inside = inChurch(x, z) && z < -110;
     this.scene.fog.color.copy(w.fogColor); this.scene.fog.density = this.dbgFog ? 0.002 : damp(this.scene.fog.density, inside ? 0.011 : 0.021, 2, dt);
     this.fx.setFog(w.fogColor, this.scene.fog.density);
-    this.fx.ambient(dt, x, p.pos.y, z, cor); this.fx.update(dt);
+    this.fx.ambient(dt, x, p.pos.y, z, cor, inside ? 0 : 1); this.fx.update(dt);
+    if (this.audio) this.soundscape(dt, x, z, cor, inside);
+  }
+
+  /** Where the ears are, what room they are in, what is underfoot, and which fire is nearest. */
+  soundscape(dt, x, z, cor, inside) {
+    const p = this.player, a = this.audio, cam = this.camera;
+    cam.getWorldDirection(_v); a.listen(x, p.pos.y + 1.6, z, _v.x, _v.y, _v.z);
+    a.setSpace(inside ? 1 : 0);
+    a.sfx.surface = inChurch(x, z) || Math.hypot(x - SQUARE.x, z - SQUARE.z) < SQUARE.r ? 'stone' : pathDist(x, z) < 3.2 ? 'mud' : 'grass';
+    let fire = null, fd = 24;
+    for (const l of this.world.lights) { if (!l.flicker || l.i <= 0) continue; const d = Math.hypot(l.x - x, l.z - z); if (d < fd) { fd = d; fire = l; } }
+    if (fire) fire.d = fd;
+    a.setMuffle(p.dead ? 0.75 : clamp(1 - p.hp / (p.maxHp * 0.3), 0, 1) * 0.3);
+    this.amb.update(dt, { x, y: p.pos.y, z, cor, inside, fire, quiet: this.combatLevel });
   }
 
   separate() {
@@ -362,7 +348,8 @@ class Game {
     const u = this.grade.uniforms, p = this.player;
     u.time.value = this.time % 100; u.hurt.value = this.hurt; u.low.value = p.dead ? 0 : clamp(1 - p.hp / (p.maxHp * 0.35), 0, 1);
     u.desat.value = damp(u.desat.value, p.dead ? 0.75 : 0, 2, 0.016); u.warm.value = damp(u.warm.value, p.buff > 0 ? 1 : 0, 3, 0.016);
-    this.composer.render();
+    this.post.sources[0].strength = this.world.skyMat.uniforms.rift.value;
+    this.post.render();
   }
 }
 

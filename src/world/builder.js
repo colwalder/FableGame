@@ -4,11 +4,32 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { lerp } from '../core/util.js';
 
-export function canvasTex(size, draw, rx = 1, ry = 1) {
-  const c = document.createElement('canvas'); c.width = c.height = size;
-  draw(c.getContext('2d'), size);
+export function canvasTex(size, draw, rx = 1, ry = 1, res = 2) {
+  const c = document.createElement('canvas'); c.width = c.height = size * res;
+  const g = c.getContext('2d', { willReadFrequently: true }); g.scale(res, res);
+  draw(g, size);
   const t = new THREE.CanvasTexture(c);
-  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 8;
+  return t;
+}
+
+/** Tangent-space normal map from the brightness of a canvas texture (bright = raised). */
+export function normalTex(src, strength = 2) {
+  const c = src.image, w = c.width, h = c.height, d = c.getContext('2d').getImageData(0, 0, w, h).data;
+  const H = new Float32Array(w * h);
+  for (let i = 0; i < w * h; i++) H[i] = (d[i * 4] * 0.3 + d[i * 4 + 1] * 0.59 + d[i * 4 + 2] * 0.11) / 255;
+  const out = document.createElement('canvas'); out.width = w; out.height = h;
+  const o = out.getContext('2d'), img = o.createImageData(w, h), q = img.data;
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+    const xl = (x - 1 + w) % w, xr = (x + 1) % w, yu = (y - 1 + h) % h, yd = (y + 1) % h;
+    const dx = (H[y * w + xr] - H[y * w + xl] + (H[yu * w + xr] - H[yu * w + xl] + H[yd * w + xr] - H[yd * w + xl]) * 0.5) * strength;
+    const dy = (H[yd * w + x] - H[yu * w + x] + (H[yd * w + xl] - H[yu * w + xl] + H[yd * w + xr] - H[yu * w + xr]) * 0.5) * strength;
+    const l = 1 / Math.hypot(dx, dy, 1), k = (y * w + x) * 4;
+    q[k] = (-dx * l * 0.5 + 0.5) * 255; q[k + 1] = (dy * l * 0.5 + 0.5) * 255; q[k + 2] = (l * 0.5 + 0.5) * 255; q[k + 3] = 255;
+  }
+  o.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(out);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.copy(src.repeat); t.anisotropy = 8;
   return t;
 }
 
@@ -78,13 +99,11 @@ function prep(geo, m, color, deform, world, jitter) {
     for (let i = 0; i < p.count; i++) { _v.fromBufferAttribute(p, i); deform(_v); p.setXYZ(i, _v.x, _v.y, _v.z); }
   }
   if (world) g.applyMatrix4(world);
-  g.computeVertexNormals();
+  if (!g.attributes.normal) g.computeVertexNormals();           // keep authored normals: round things stay round
   const n = g.attributes.position.count, col = new Float32Array(n * 3);
   _c.set(color);
-  for (let i = 0; i < n; i += 3) {
-    const k = 1 + (Math.random() - 0.5) * jitter;
-    for (let j = 0; j < 3 && i + j < n; j++) { col[(i + j) * 3] = _c.r * k; col[(i + j) * 3 + 1] = _c.g * k; col[(i + j) * 3 + 2] = _c.b * k; }
-  }
+  const k = 1 + (Math.random() - 0.5) * jitter;                 // one shade per piece; the textures carry the fine detail
+  for (let i = 0; i < n; i++) { col[i * 3] = _c.r * k; col[i * 3 + 1] = _c.g * k; col[i * 3 + 2] = _c.b * k; }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
   if (!g.attributes.uv) g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
   for (const k of Object.keys(g.attributes)) if (!['position', 'normal', 'uv', 'color'].includes(k)) g.deleteAttribute(k);
@@ -115,12 +134,12 @@ export class Builder {
   constructor() { this.items = []; }
   geo(mat, geometry, m, color = 0xffffff) { this.items.push({ geo: geometry, mat, m: m || new THREE.Matrix4(), color }); return this; }
   box(mat, w, h, d, x, y, z, color, rx = 0, ry = 0, rz = 0) { return this.geo(mat, UNIT_BOX, mat4(x, y, z, rx, ry, rz, w, h, d), color); }
-  cyl(mat, rt, rb, h, x, y, z, color, rx = 0, ry = 0, rz = 0, seg = 7) {
+  cyl(mat, rt, rb, h, x, y, z, color, rx = 0, ry = 0, rz = 0, seg = 10) {
     const m = Math.max(rt, rb, 1e-4);
     return this.geo(mat, cylGeo(rt / m, rb / m, seg), mat4(x, y, z, rx, ry, rz, m, h, m), color);
   }
   cone(mat, r, h, x, y, z, color, rx = 0, ry = 0, rz = 0, seg = 6) { return this.cyl(mat, 0, r, h, x, y, z, color, rx, ry, rz, seg); }
-  sph(mat, r, x, y, z, color, sx = 1, sy = 1, sz = 1, seg = 7) { return this.geo(mat, sphGeo(seg), mat4(x, y, z, 0, 0, 0, r * sx, r * sy, r * sz), color); }
+  sph(mat, r, x, y, z, color, sx = 1, sy = 1, sz = 1, seg = 10) { return this.geo(mat, sphGeo(seg), mat4(x, y, z, 0, 0, 0, r * sx, r * sy, r * sz), color); }
   /** Tapered limb from point a to point b. */
   between(mat, a, b, r0, r1, color, seg = 6) {
     const A = new THREE.Vector3(...a), Bv = new THREE.Vector3(...b), d = Bv.clone().sub(A), len = d.length();
@@ -186,17 +205,30 @@ export function makeMaterials() {
       g.beginPath(); g.roundRect(x * 32 + (y % 2) * 16 + 1.5, y * 32 - 6, 29, 36, [0, 0, 12, 12]); g.fill();
     }
   }, 3, 3);
+  // fine grain for everything that has no picture of its own: hewn timber, cloth, beaten iron, bark
+  const grain = canvasTex(128, (g, s) => {
+    g.fillStyle = '#808080'; g.fillRect(0, 0, s, s);
+    for (let i = 0; i < 2600; i++) { const v = Math.random() < 0.5 ? 30 : 225; g.fillStyle = `rgba(${v},${v},${v},${Math.random() * 0.3})`; g.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 2.5, 1 + Math.random() * 7); }
+  }, 2, 2);
+  const weave = canvasTex(64, (g, s) => {
+    g.fillStyle = '#707070'; g.fillRect(0, 0, s, s);
+    for (let y = 0; y < s; y += 4) for (let x = 0; x < s; x += 4) { g.fillStyle = ((x + y) / 4) % 2 ? '#b8b8b8' : '#484848'; g.fillRect(x, y + (((x / 4) % 2) ? 0 : 2), 3, 2); }
+  }, 6, 6);
+  const nGrain = normalTex(grain, 1.4), nWeave = normalTex(weave, 1.2);
   const std = (o) => new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, ...o });
+  const N = (t, k, sc = 1) => ({ map: t, normalMap: normalTex(t, k), normalScale: new THREE.Vector2(sc, sc) });
   const M = {
-    wood: std({ map: logs }), plank: std({ map: plank }), thatch: std({ map: thatch, roughness: 1 }),
-    stone: std({ map: stone, roughness: 0.9 }), shingle: std({ map: shingle, roughness: 0.85 }),
-    plain: std({}), cloth: std({ side: THREE.DoubleSide, roughness: 1 }), metal: std({ roughness: 0.45, metalness: 0.75 }),
-    root: std({ roughness: 0.65 }),
+    wood: std({ ...N(logs, 3.2), roughness: 0.82 }), plank: std({ ...N(plank, 2.6), roughness: 0.85 }), thatch: std({ ...N(thatch, 3), roughness: 1 }),
+    stone: std({ ...N(stone, 3.4), roughness: 0.78 }), shingle: std({ ...N(shingle, 3), roughness: 0.7 }),
+    plain: std({ normalMap: nGrain, normalScale: new THREE.Vector2(0.5, 0.5) }), cloth: std({ side: THREE.DoubleSide, roughness: 1, normalMap: nWeave, normalScale: new THREE.Vector2(0.6, 0.6) }),
+    metal: std({ roughness: 0.38, metalness: 0.85, normalMap: nGrain, normalScale: new THREE.Vector2(0.35, 0.35) }),
+    root: std({ roughness: 0.5, normalMap: nGrain, normalScale: new THREE.Vector2(0.9, 0.9) }),
     glow: new THREE.MeshStandardMaterial({ color: 0x1a0503, emissive: 0xff3210, emissiveIntensity: 2.4, roughness: 0.4 }),
     fire: new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffa044, emissiveIntensity: 3.2 }),
     window: new THREE.MeshStandardMaterial({ color: 0x100404, emissive: 0xc02c10, emissiveIntensity: 1.5 }),
-    gild: new THREE.MeshStandardMaterial({ color: 0x8a6a2a, emissive: 0x5a3a08, emissiveIntensity: 0.5, roughness: 0.4, metalness: 0.8, vertexColors: true }),
+    gild: new THREE.MeshStandardMaterial({ color: 0x8a6a2a, emissive: 0x5a3a08, emissiveIntensity: 0.5, roughness: 0.32, metalness: 0.9, vertexColors: true, normalMap: nGrain, normalScale: new THREE.Vector2(0.3, 0.3) }),
   };
+  M.detail = { grain: nGrain, weave: nWeave };
   for (const k of ['glow', 'fire', 'window']) M[k].userData.noShadow = true;
   return M;
 }

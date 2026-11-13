@@ -10,6 +10,21 @@ function spriteTex() {
   return new THREE.CanvasTexture(c);
 }
 
+/** A torn, cloudy puff for smoke, dust and ground mist. */
+function puffTex() {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const g = c.getContext('2d');
+  for (let i = 0; i < 70; i++) {
+    const a = Math.random() * TAU, d = Math.sqrt(Math.random()) * 34, x = 64 + Math.cos(a) * d, y = 64 + Math.sin(a) * d, r = 12 + Math.random() * 20;
+    const gr = g.createRadialGradient(x, y, 0, x, y, r); gr.addColorStop(0, `rgba(255,255,255,${0.05 + Math.random() * 0.1})`); gr.addColorStop(1, 'rgba(255,255,255,0)');
+    g.fillStyle = gr; g.fillRect(x - r, y - r, r * 2, r * 2);
+  }
+  g.globalCompositeOperation = 'destination-in';
+  const m = g.createRadialGradient(64, 64, 8, 64, 64, 64); m.addColorStop(0, 'rgba(0,0,0,1)'); m.addColorStop(0.6, 'rgba(0,0,0,.7)'); m.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = m; g.fillRect(0, 0, 128, 128);
+  return new THREE.CanvasTexture(c);
+}
+
 const VS = `
 attribute vec4 pcolor; attribute float psize;
 varying vec4 vC; varying float vFog;
@@ -81,12 +96,13 @@ export class FX {
     const tex = spriteTex();
     this.add = new PSys(scene, 3600, true, tex);
     this.alp = new PSys(scene, 2600, false, tex);
-    this.ashT = 0;
+    this.puf = new PSys(scene, 1400, false, puffTex()); this.puf.points.renderOrder = 9;
+    this.ashT = 0; this.mistT = 0;
   }
   setFog(color, density) {
-    for (const s of [this.add, this.alp]) { s.mat.uniforms.fogColor.value.copy(color); s.mat.uniforms.fogDensity.value = density; }
+    for (const s of [this.add, this.alp, this.puf]) { s.mat.uniforms.fogColor.value.copy(color); s.mat.uniforms.fogDensity.value = density; }
   }
-  resize(h) { this.add.mat.uniforms.scale.value = this.alp.mat.uniforms.scale.value = h * 0.9; }
+  resize(h) { this.add.mat.uniforms.scale.value = this.alp.mat.uniforms.scale.value = this.puf.mat.uniforms.scale.value = h * 0.9; }
 
   blood(x, y, z, dx, dz, n = 14, ichor = true) {
     for (let i = 0; i < n; i++) {
@@ -107,11 +123,11 @@ export class FX {
   dust(x, y, z, n = 10, spread = 1, dark = 0.3) {
     for (let i = 0; i < n; i++) {
       const a = rand(TAU), sp = rand(0.5, 3) * spread, v = dark * rand(0.7, 1.2);
-      this.alp.spawn(x + Math.cos(a) * rand(spread * 0.5), y + rand(0.1, 0.3), z + Math.sin(a) * rand(spread * 0.5), Math.cos(a) * sp, rand(0.3, 1.6), Math.sin(a) * sp, rand(0.7, 1.6), rand(0.5, 0.9), rand(1.6, 2.8), v, v * 0.92, v * 0.85, 0.35, -0.2, 2);
+      this.puf.spawn(x + Math.cos(a) * rand(spread * 0.5), y + rand(0.1, 0.3), z + Math.sin(a) * rand(spread * 0.5), Math.cos(a) * sp, rand(0.3, 1.6), Math.sin(a) * sp, rand(0.7, 1.6), rand(0.7, 1.1), rand(2, 3.2), v * 0.6, v * 0.55, v * 0.5, 0.4, -0.2, 2);
     }
   }
   smoke(x, y, z, n = 6, shade = 0.04, size = 1) {
-    for (let i = 0; i < n; i++) this.alp.spawn(x + rand(-0.3, 0.3) * size, y + rand(-0.3, 0.3) * size, z + rand(-0.3, 0.3) * size, rand(-0.5, 0.5), rand(0.3, 1.5), rand(-0.5, 0.5), rand(0.8, 2), 0.8 * size, 2.4 * size, shade, shade * 0.7, shade * 0.8, 0.6, -0.1, 1);
+    for (let i = 0; i < n; i++) this.puf.spawn(x + rand(-0.3, 0.3) * size, y + rand(-0.3, 0.3) * size, z + rand(-0.3, 0.3) * size, rand(-0.5, 0.5), rand(0.3, 1.5), rand(-0.5, 0.5), rand(0.8, 2), 1 * size, 2.8 * size, shade, shade * 0.7, shade * 0.8, 0.6, -0.1, 1);
   }
   flame(x, y, z, size = 1) {
     this.add.spawn(x + rand(-0.08, 0.08) * size, y, z + rand(-0.08, 0.08) * size, rand(-0.15, 0.15), rand(0.7, 1.6) * size, rand(-0.15, 0.15), rand(0.3, 0.6), 0.5 * size, 0.08 * size, 1, rand(0.35, 0.6), 0.1, 0.8, 0, 0.5);
@@ -147,7 +163,15 @@ export class FX {
     for (let i = 0; i < n; i++) { const a = rand(TAU); this.add.spawn(x, y + rand(0.3, 1.2), z, Math.cos(a) * rand(0.5, 2), rand(1.5, 4), Math.sin(a) * rand(0.5, 2), rand(0.6, 1.1), 0.14, 0.02, 0.8, 0.88, 1, 1, 3, 1.5); }
   }
   /** Ambient ash and embers drifting around the camera. */
-  ambient(dt, px, py, pz, corruption) {
+  ambient(dt, px, py, pz, corruption, mist = 1) {
+    // low mist crawling over the ground, redder the nearer the church
+    this.mistT += dt * 9 * mist;
+    while (this.mistT > 1) {
+      this.mistT -= 1;
+      const a = rand(TAU), d = rand(6, 30), v = rand(0.012, 0.022);
+      this.puf.spawn(px + Math.cos(a) * d, py + rand(-0.4, 0.7), pz + Math.sin(a) * d, rand(-0.5, 0.1), rand(0, 0.04), rand(-0.4, 0.2), rand(7, 12), rand(5, 8), rand(9, 14),
+        v * (1 + corruption * 1.6), v * (1.1 - corruption * 0.4), v * (1.5 - corruption * 0.8), 0.32, 0, 0);
+    }
     this.ashT += dt * (26 + corruption * 40);
     while (this.ashT > 1) {
       this.ashT -= 1;
@@ -156,7 +180,7 @@ export class FX {
       else { const v = rand(0.25, 0.5); this.alp.spawn(x, y, z, rand(-0.7, 0.1), rand(-0.6, -0.15), rand(-0.6, 0.2), rand(4, 7), rand(0.05, 0.1), 0.05, v, v, v * 1.05, 0.55, 0, 0); }
     }
   }
-  update(dt) { this.add.update(dt); this.alp.update(dt); }
+  update(dt) { this.add.update(dt); this.alp.update(dt); this.puf.update(dt); }
 }
 
 /** Ribbon that follows the blade through a swing. */

@@ -53,7 +53,7 @@ export class Hazards {
           h.d.material.opacity = 0.05 + k * k * 0.4; h.d.scale.setScalar(h.r * (0.2 + 0.8 * k)); h.rim.material.opacity = 0.5 + 0.5 * Math.sin(h.t * 22);
           if (h.t >= h.delay) {
             h.done = true; h.t = 0; h.g.visible = false;
-            g.audio.sfx.erupt(); g.shake(0.35, h.x, h.z);
+            g.audio.sfx.at(h).erupt(); g.shake(0.35, h.x, h.z);
             if (h.kind === 'roots') {
               for (let n = 0; n < 7; n++) { const a = rand(TAU), d = Math.sqrt(Math.random()) * h.r * 0.85; const s = new THREE.Mesh(this.spikeGeo, this.spikeMat); s.position.set(h.x + Math.sin(a) * d, h.y - 0.2, h.z + Math.cos(a) * d); s.rotation.set(rand(-0.35, 0.35), rand(TAU), rand(-0.35, 0.35)); s.userData.h = rand(1.6, 3.4); s.scale.set(1.3, 0.01, 1.3); s.castShadow = true; g.scene.add(s); h.spikes.push(s); }
               fx.dust(h.x, h.y, h.z, 14, h.r * 0.7, 0.12); fx.sparks(h.x, h.y + 0.3, h.z, 10, 1, 0.2, 0.08);
@@ -88,7 +88,7 @@ export class Hazards {
         if (hitP && p.takeDamage(h.dmg, { x: m.x - h.vx, z: m.z - h.vz }, { knock: 3 })) dead = true;
         const b = h.bounds;
         if (h.t > h.life || m.y < groundHeight(m.x, m.z) + 0.1 || (b && (m.x < b.minX - 1.4 || m.x > b.maxX + 1.4 || m.z < b.minZ - 5 || m.z > b.maxZ + 1))) dead = true;
-        if (dead) { fx.burst(m.x, m.y, m.z, h.color.r, h.color.g, h.color.b, 12, 4, 0.25, 0.5); g.audio.sfx.orb(); }
+        if (dead) { fx.burst(m.x, m.y, m.z, h.color.r, h.color.g, h.color.b, 12, 4, 0.25, 0.5); g.audio.sfx.at(m).orb(); }
       }
       if (dead) { this._remove(h); this.list.splice(i, 1); }
     }

@@ -76,17 +76,17 @@ export class Enemy extends Actor {
     this.knock(from, this.type === 'brute' ? 1.5 : a.big ? 7 : 4);
     if (this.hp <= 0) { this.die(from); return true; }
     if (this.poise <= 0) { this.poise = this.def.poise; if (this.state !== 'rise') this.set('stagger'); this.cd = 0.4; }
-    else if (this.type === 'brute') g.audio.sfx.groan(0.6, 0.25);
+    else if (this.type === 'brute') g.audio.sfx.at(this.pos).groan(0.6, 0.25);
     return true;
   }
   die(from) {
     const g = this.game; this.dead = true; this.aggro = false; this.set('dead'); this.knock(from, 6);
-    if (this.type === 'strzyga') g.audio.sfx.screech(0.2); else if (this.type === 'wailer') g.audio.sfx.wail(0.25); else g.audio.sfx.groan(this.def.pitch * 0.8, 0.3);
+    { const sfx = g.audio.sfx.at(this.pos); if (this.type === 'strzyga') sfx.screech(0.2); else if (this.type === 'wailer') sfx.wail(0.25); else sfx.groan(this.def.pitch * 0.8, 0.3); }
     g.onEnemyKilled(this);
   }
 
   update(dt) {
-    const g = this.game, pl = g.player, D = this.def, sfx = g.audio.sfx;
+    const g = this.game, pl = g.player, D = this.def, sfx = g.audio.sfx.at(this.pos);
     this.t += dt; this.time += dt; this.cd -= dt; this.look();
     const d = this._d, toP = this._a, near = Math.max(0.15, 1 - d / 30);
     let pose = null, rate = 10, moveSpeed = 0;

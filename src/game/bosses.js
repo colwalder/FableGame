@@ -27,7 +27,7 @@ class Boss extends Actor {
   melee(steps, rec) { this.seq = { steps, i: 0, ts: 0, rec }; this.set('melee'); this.swung = false; }
   /** Returns a pose; drives timing, hit checks, effects. */
   runMelee(dt) {
-    const q = this.seq, s = q.steps[q.i], g = this.game, sfx = g.audio.sfx;
+    const q = this.seq, s = q.steps[q.i], g = this.game, sfx = g.audio.sfx.at(this.pos);
     q.ts += dt * this.tempo; const t = q.ts, k = clamp((t - s.wind) / s.act, 0, 1);
     if (t < s.wind) { this.face(this._a, t < s.wind - 0.2 ? (s.track || 3.2) : 0.4, dt); this.glint(Math.pow(t / s.wind, 3) * 5); }
     else {
@@ -92,7 +92,7 @@ export class Templar extends Boss {
   startRoots() { this.set('roots'); this.rootsLeft = 4; this.rootT = 0; }
 
   update(dt) {
-    const g = this.game, pl = g.player, sfx = g.audio.sfx, m = this.model;
+    const g = this.game, pl = g.player, sfx = g.audio.sfx.at(this.pos), m = this.model;
     this.t += dt; this.time += dt; this.cd -= dt; this.look();
     let pose, rate = 9; this.poseRate = 0;
     // the heartbeat that holds the seal
@@ -228,7 +228,7 @@ export class Priest extends Boss {
   }
 
   update(dt) {
-    const g = this.game, pl = g.player, sfx = g.audio.sfx, m = this.model;
+    const g = this.game, pl = g.player, sfx = g.audio.sfx.at(this.pos), m = this.model;
     this.t += dt; this.time += dt; this.cd -= dt; this.songCd -= dt; this.look();
     let pose, rate = 8; this.poseRate = 0; const p2 = this.phase === 2;
     const beat = g.world.pulse, live = this.active && !this.dead;

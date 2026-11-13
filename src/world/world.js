@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { Batch, Builder, makeMaterials, mat4, tubeGeo, canvasTex, bake } from './builder.js';
+import { Batch, Builder, makeMaterials, mat4, tubeGeo, canvasTex, normalTex, bake } from './builder.js';
 import * as P from './props.js';
 import { groundHeight, terrainHeight, pathDist, corruption, SQUARE, CHURCH, BOUNDS } from './terrain.js';
 import { clamp, lerp, sstep, fbm, noise2, rng, TAU, angDiff } from '../core/util.js';
@@ -68,26 +68,42 @@ export class World {
       fragmentShader: `
         varying vec3 vDir; uniform vec3 horizon, zenith; uniform float time, rift;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(127.1,311.7)))*43758.5453); }
+        float hash3(vec3 p){ return fract(sin(dot(p, vec3(127.1,311.7,74.7)))*43758.5453); }
         float noise(vec2 p){ vec2 i=floor(p), f=fract(p); f=f*f*(3.-2.*f); return mix(mix(hash(i),hash(i+vec2(1,0)),f.x), mix(hash(i+vec2(0,1)),hash(i+vec2(1,1)),f.x), f.y); }
-        float fbm(vec2 p){ float a=.5, s=0.; for(int i=0;i<4;i++){ s+=noise(p)*a; p=p*2.1+7.; a*=.5; } return s; }
+        float fbm(vec2 p){ float a=.5, s=0.; for(int i=0;i<5;i++){ s+=noise(p)*a; p=p*2.1+7.; a*=.5; } return s; }
         void main(){
           vec3 d = normalize(vDir); float h = clamp(d.y, 0., 1.);
-          vec3 c = mix(horizon, zenith, pow(h, .5));
-          vec3 md = normalize(vec3(-.45,.55,.7)); float m = dot(d, md);
-          vec3 moon = vec3(.8,.86,1.) * smoothstep(.9982,.999,m) * 2.2 + vec3(.2,.26,.42)*pow(max(m,0.),40.)*.7;
-          vec2 uv = d.xz/(abs(d.y)+.22);
-          float cl = fbm(uv*1.4 + vec2(time*.012, time*.004));
-          float cm = smoothstep(.42,.78,cl)*smoothstep(0.,.3,d.y);
-          c = mix(c + moon, c*.35 + vec3(.012,.016,.024) + moon*.12, cm);
+          vec3 c = mix(horizon, zenith, pow(h, .45));
           vec3 rd = normalize(vec3(0.,.5,-1.)); float r = max(dot(d, rd), 0.);
+          // stars, thinning toward the rift and the horizon
+          vec3 sd = d * 170., cell = floor(sd); float sh = hash3(cell);
+          float star = step(.9955, sh) * smoothstep(.45, 0., length(fract(sd) - .5)) * (.55 + .45 * sin(time * (1.5 + sh * 40.) + sh * 90.));
+          vec3 sky = c + mix(vec3(.75,.85,1.), vec3(1.,.85,.7), fract(sh * 77.)) * star * 1.6 * smoothstep(.04, .4, d.y) * (1. - pow(r, 3.));
+          // the moon: a lit disc with maria, a tight corona and a wide veil
+          vec3 md = normalize(vec3(-.45,.55,.7)); float m = dot(d, md);
+          vec3 mu = normalize(cross(md, vec3(0.,1.,0.))), mv = cross(mu, md);
+          vec2 mp = vec2(dot(d, mu), dot(d, mv)) / .052;
+          float disc = smoothstep(1., .93, length(mp)), limb = sqrt(max(1. - dot(mp, mp) * .7, 0.));
+          float maria = smoothstep(.35, .7, fbm(mp * 2.2 + 3.)) * .55 + fbm(mp * 9.) * .2;
+          vec3 moon = vec3(.86,.9,1.) * disc * limb * (1.15 - maria) * 2.6;
+          vec3 halo = vec3(.2,.26,.42) * (pow(max(m,0.), 40.) * .6 + pow(max(m,0.), 700.) * 1.1);
+          // two cloud decks, silvered by the moon and lit from beneath by the wound in the sky
+          vec2 uv = d.xz/(abs(d.y)+.22);
+          float c1 = fbm(uv*1.3 + vec2(time*.012, time*.004)), c2 = fbm(uv*3.1 - vec2(time*.02, time*.007) + 4.);
+          float cm = smoothstep(.40,.74, c1*.78 + c2*.3) * smoothstep(0.,.3,d.y);
+          float thick = smoothstep(.45,.85, c1);
+          vec3 cloud = vec3(.012,.016,.024) + c*.3
+            + vec3(.2,.25,.36) * pow(max(m,0.), 5.) * (1.15 - thick) * (.5 + c2)
+            + rift * vec3(.4,.05,.015) * pow(r, 8.) * (1.25 - thick) * (.4 + c2 * 1.2);
+          c = mix(sky + moon + halo, cloud + (moon + halo) * .1 * (1. - thick), cm);
           float ang = atan(d.x, d.y - .45);
           float sw = fbm(vec2(ang*2.5 + time*.2 + r*6., r*10. - time*.25));
           c += rift * vec3(1.,.12,.03) * (pow(r, 60.) * (.35 + sw*1.6) + pow(r, 9.) * .1);
-          c += rift * vec3(1.,.5,.2) * smoothstep(.992,.9997,r) * 1.4;
+          c += rift * vec3(1.,.45,.16) * smoothstep(.992,.9997,r) * 1.1;
           gl_FragColor = vec4(c, 1.);
         }`,
     });
-    this.sky = new THREE.Mesh(new THREE.SphereGeometry(430, 28, 18), this.skyMat);
+    this.sky = new THREE.Mesh(new THREE.SphereGeometry(430, 48, 32), this.skyMat);
     this.sky.frustumCulled = false; this.sky.renderOrder = -10; this.scene.add(this.sky);
     // pillar of light from the church dome into the rift
     const bm = new THREE.ShaderMaterial({
@@ -101,6 +117,16 @@ export class World {
     this.beamMat = bm;
     const beam = new THREE.Mesh(new THREE.CylinderGeometry(16, 2.6, 150, 20, 1, true), bm);
     beam.position.set(CHURCH.x, CHURCH.y + 36 + 75, CHURCH.z); beam.renderOrder = -5; this.scene.add(beam);
+  }
+
+  /** Bake the sky into an environment map so metal, wet mud and gilt have something to reflect. */
+  bakeEnv(renderer) {
+    const pm = new THREE.PMREMGenerator(renderer), sc = new THREE.Scene();
+    sc.add(new THREE.Mesh(this.sky.geometry, this.skyMat));
+    const rt = pm.fromScene(sc, 0.02, 1, 1000);
+    if (this.envRT) this.envRT.dispose();
+    this.envRT = rt; this.scene.environment = rt.texture; pm.dispose();
+    this.ground.material.envMap = rt.texture; this.ground.material.envMapIntensity = 0.4;   // puddles should glint, not glow
   }
 
   groundColor(x, z, c) {
@@ -123,13 +149,30 @@ export class World {
       p.setY(i, terrainHeight(x, z)); this.groundColor(x, z, c);
       col[i * 3] = c.r; col[i * 3 + 1] = c.g; col[i * 3 + 2] = c.b;
     }
-    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.computeVertexNormals();
+    const wet = new Float32Array(p.count);
+    for (let i = 0; i < p.count; i++) { const x = p.getX(i), z = p.getZ(i); wet[i] = sstep(3.6, 1.6, pathDist(x, z)) * sstep(0.5, 0.64, fbm(x * 0.23 + 3, z * 0.23 + 8)) * sstep(-96, -90, z); }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3)); g.setAttribute('wet', new THREE.BufferAttribute(wet, 1)); g.computeVertexNormals();
     const tex = canvasTex(256, (cx, s) => {
       cx.fillStyle = '#b4b4b4'; cx.fillRect(0, 0, s, s);
       for (let i = 0; i < 5000; i++) { const v = 90 + Math.random() * 165; cx.fillStyle = `rgba(${v},${v},${v},${0.25 + Math.random() * 0.4})`; cx.fillRect(Math.random() * s, Math.random() * s, 1 + Math.random() * 3, 1 + Math.random() * 3); }
       for (let i = 0; i < 60; i++) { cx.fillStyle = `rgba(40,40,40,${Math.random() * 0.25})`; cx.beginPath(); cx.arc(Math.random() * s, Math.random() * s, 4 + Math.random() * 14, 0, TAU); cx.fill(); }
+      for (let i = 0; i < 26; i++) { const x = Math.random() * s, y = Math.random() * s, r = 3 + Math.random() * 6; const gr = cx.createRadialGradient(x - r * 0.3, y - r * 0.3, 0, x, y, r); gr.addColorStop(0, 'rgba(235,235,230,.9)'); gr.addColorStop(1, 'rgba(70,70,70,.9)'); cx.fillStyle = gr; cx.beginPath(); cx.ellipse(x, y, r, r * (0.6 + Math.random() * 0.4), Math.random() * 3, 0, TAU); cx.fill(); }   // pebbles
     }, 70, 110);
-    const m = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, roughness: 1 }));
+    const gm = new THREE.MeshStandardMaterial({ vertexColors: true, map: tex, normalMap: normalTex(tex, 3), normalScale: new THREE.Vector2(1.1, 1.1), roughness: 0.96 });
+    gm.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nattribute float wet; varying float vWet; varying vec2 vWp;')
+        .replace('#include <begin_vertex>', '#include <begin_vertex>\nvWet = wet; vWp = position.xz;');
+      sh.fragmentShader = sh.fragmentShader.replace('#include <common>', '#include <common>\nvarying float vWet; varying vec2 vWp;')
+        // break up the tiling with two larger octaves of the same texture, and pool standing water in the ruts
+        .replace('#include <map_fragment>', `#include <map_fragment>
+          float macro = texture2D(map, vWp * .0213).g, macro2 = texture2D(map, vWp.yx * .0057 + .3).g;
+          diffuseColor.rgb *= (.6 + macro * .55) * (.72 + macro2 * .42);
+          float pud = smoothstep(.6, .9, vWet * (.35 + macro));
+          diffuseColor.rgb *= mix(1., .3, pud);`)
+        .replace('#include <roughnessmap_fragment>', '#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor - vWet * .2, .14, pud);')
+        .replace('#include <normal_fragment_maps>', '#include <normal_fragment_maps>\nnormal = normalize(mix(normal, nonPerturbedNormal, pud * .97));');
+    };
+    const m = new THREE.Mesh(g, gm);
     m.receiveShadow = true; this.scene.add(m); this.ground = m;
   }
 
@@ -360,23 +403,38 @@ export class World {
 
   _grass() {
     const r = this.r, pos = [], col = [];
-    const blade = (a, h, w, lean) => {
-      const dx = Math.cos(a) * w, dz = Math.sin(a) * w, tx = Math.cos(a + 1.3) * lean, tz = Math.sin(a + 1.3) * lean;
-      pos.push(-dx, 0, -dz, dx, 0, dz, tx, h, tz); col.push(0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 1, 1, 1);
+    // a tuft: nine thin two-segment blades that bend outward
+    const blade = (a, h, w, lean, ox, oz) => {
+      const dx = Math.cos(a) * w, dz = Math.sin(a) * w, lx = Math.cos(a + 1.57) * lean, lz = Math.sin(a + 1.57) * lean;
+      const mx = ox + lx * 0.35, mz = oz + lz * 0.35, mh = h * 0.55, tx = ox + lx, tz = oz + lz;
+      pos.push(ox - dx, 0, oz - dz, ox + dx, 0, oz + dz, mx + dx * 0.7, mh, mz + dz * 0.7,
+        ox - dx, 0, oz - dz, mx + dx * 0.7, mh, mz + dz * 0.7, mx - dx * 0.7, mh, mz - dz * 0.7,
+        mx - dx * 0.7, mh, mz - dz * 0.7, mx + dx * 0.7, mh, mz + dz * 0.7, tx, h, tz);
+      col.push(0.45, 0.45, 0.45, 0.45, 0.45, 0.45, 0.75, 0.75, 0.75, 0.45, 0.45, 0.45, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 0.75, 1, 1, 1);
     };
-    blade(0, 0.55, 0.05, 0.12); blade(2.1, 0.42, 0.05, -0.14); blade(4.2, 0.62, 0.04, 0.08); blade(1, 0.35, 0.05, 0.16);
+    { const R = rng(4242); for (let i = 0; i < 9; i++) { const a = R() * TAU, d = R() * 0.2; blade(R() * TAU, 0.28 + R() * 0.34, 0.016 + R() * 0.01, (R() - 0.3) * 0.3, Math.cos(a) * d, Math.sin(a) * d); } }
     const g = new THREE.BufferGeometry(); g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3)); g.computeVertexNormals();
     const na = g.attributes.normal; for (let i = 0; i < na.count; i++) na.setXYZ(i, 0, 1, 0);
-    const N = 9000, im = new THREE.InstancedMesh(g, new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 1 }), N);
+    const gmat = new THREE.MeshStandardMaterial({ vertexColors: true, side: THREE.DoubleSide, roughness: 0.9 });
+    this.wind = { value: 0 };
+    gmat.onBeforeCompile = (sh) => {
+      sh.uniforms.wind = this.wind;
+      sh.vertexShader = sh.vertexShader.replace('#include <common>', '#include <common>\nuniform float wind;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+          vec2 ip = instanceMatrix[3].xz; float tipW = clamp((color.r - .45) / .55, 0., 1.);
+          float gust = sin(wind * 1.6 + ip.x * .31 + ip.y * .23) + .5 * sin(wind * 3.7 + ip.x * 1.3 - ip.y * .9) + .6 * sin(wind * .5 + ip.y * .07);
+          transformed.xz += tipW * tipW * vec2(.16, .09) * gust;`);
+    };
+    const N = 64000, im = new THREE.InstancedMesh(g, gmat, N);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), dead = C(0x5a5a34), dry = C(0x7a6e3c), sick = C(0x2a1c22), wheat = C(0x857238);
     let n = 0;
-    for (let i = 0; i < 40000 && n < N; i++) {
+    for (let i = 0; i < 260000 && n < N; i++) {
       const x = lerp(BOUNDS.minX - 6, BOUNDS.maxX + 6, r()), z = lerp(BOUNDS.minZ - 4, BOUNDS.maxZ + 10, r());
       const field = x > -41 && x < -8 && z > 35 && z < 63;
       if (pathDist(x, z) < 2.6 || Math.hypot(x - SQUARE.x, z - SQUARE.z) < SQUARE.r + 0.6 || (z < -99 && Math.abs(x) < 14 && z > -152)) continue;
-      if (!field && fbm(x * 0.12 + 5, z * 0.12) < 0.42 && r() < 0.8) continue;
+      if (!field && fbm(x * 0.12 + 5, z * 0.12) < 0.4 && r() < 0.7) continue;
       if (!this.free(x, z, 0.1)) continue;
-      const cor = corruption(x, z), s = (field ? 1.5 : 0.9) + r() * 0.9;
+      const cor = corruption(x, z), s = (field ? 1.7 : 0.8) + r() * 0.8;
       q.setFromEuler(new THREE.Euler(0, r() * TAU, 0));
       m.compose(new THREE.Vector3(x, terrainHeight(x, z) - 0.03, z), q, new THREE.Vector3(s, s * (1 - cor * 0.35), s)); im.setMatrixAt(n, m);
       c.copy(field ? wheat : dead).lerp(dry, r() * 0.6).lerp(sick, clamp(cor * 1.1 - 0.15 + (r() - 0.5) * 0.3, 0, 0.92)).multiplyScalar(0.55 + r() * 0.5); im.setColorAt(n, c); n++;
@@ -496,7 +554,7 @@ export class World {
     this.mats.fire.emissiveIntensity = 2.8 + Math.sin(t * 17) * 0.5;
     this.mats.window.emissiveIntensity = 1.0 + this.pulse * 0.9;
     this.sealMat.emissiveIntensity = 0.4 + this.pulse * 1.6;
-    this.skyMat.uniforms.time.value = t; this.beamMat.uniforms.time.value = t;
+    this.skyMat.uniforms.time.value = t; this.beamMat.uniforms.time.value = t; this.wind.value = t;
     const c = sstep(60, -105, pz);
     this.fogColor.copy(FOG_A).lerp(FOG_B, c * 0.85);
     this.skyMat.uniforms.horizon.value.copy(this.fogColor);
