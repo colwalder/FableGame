@@ -98,7 +98,30 @@ export class AudioSys {
     this.space = 0;
     this.sfx = new Sfx(this);
   }
-  resume() { if (this.ctx.state !== 'running') this.ctx.resume(); }
+  resume() { if (this.ctx.state !== 'running') { const p = this.ctx.resume(); if (p && p.catch) p.catch(() => {}); } }
+  /**
+   * Phones: make sure the game is allowed to be heard. Call from a tap.
+   * iOS treats web audio as "ambient" sound, which the ring/silent switch mutes; asking for the
+   * playback session (or, on older iOS, keeping a silent media element playing) lifts that.
+   * The context is also resumed on every later touch, since phones suspend it on lock or app switch.
+   */
+  unlock() {
+    this.resume();
+    if (this._unlocked) return; this._unlocked = true;
+    try {
+      if (navigator.audioSession) navigator.audioSession.type = 'playback';
+      else if (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.maxTouchPoints > 1 && /Mac/.test(navigator.platform || ''))) {
+        const n = 4410, b = new DataView(new ArrayBuffer(44 + n * 2)), w = (o, t) => { for (let i = 0; i < t.length; i++) b.setUint8(o + i, t.charCodeAt(i)); };
+        w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
+        b.setUint32(24, 44100, true); b.setUint32(28, 88200, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
+        const a = this._silence = new Audio(URL.createObjectURL(new Blob([b], { type: 'audio/wav' })));
+        a.loop = true; a.setAttribute('playsinline', ''); const p = a.play(); if (p && p.catch) p.catch(() => {});
+      }
+    } catch (e) { /* best effort */ }
+    const wake = () => this.resume();
+    for (const ev of ['pointerdown', 'touchend', 'keydown']) addEventListener(ev, wake, { passive: true });
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) this.resume(); });
+  }
   /** 0 = open air, 1 = inside the church. */
   setSpace(k) {
     if (Math.abs(k - this.space) < 0.01) return; this.space = k; const t = this.ctx.currentTime;

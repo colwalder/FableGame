@@ -77,7 +77,7 @@ class Game {
 
   start() {
     if (this.state !== 'title') return;
-    this.audio = new AudioSys(this.lite); this.audio.resume(); this.music = new Music(this.audio); this.music.setState('explore'); this.amb = new Ambience(this.audio);
+    this.audio = new AudioSys(this.lite); this.audio.unlock(); this.music = new Music(this.audio); this.music.setState('explore'); this.amb = new Ambience(this.audio);
     this.ui.hideTitle(); this.ui.showHud(true); this.state = 'play'; this.touch.immerse();
     if (!this.touch.enabled) { this.input.wantLock = true; this.input.lock(); }
     this.ui.fade(true); setTimeout(() => this.ui.fade(false), 60);
