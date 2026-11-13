@@ -69,10 +69,10 @@ const COMP_FS = `
   }`;
 
 class ScenePass extends Pass {
-  constructor(scene, camera) {
+  constructor(scene, camera, samples = 4) {
     super();
     this.scene = scene; this.camera = camera;
-    this.rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples: 4, depthTexture: new THREE.DepthTexture(2, 2) });
+    this.rt = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, samples, depthTexture: new THREE.DepthTexture(2, 2) });
     this.aux = new THREE.WebGLRenderTarget(2, 2, { type: THREE.HalfFloatType, depthBuffer: false });
     this.auxMat = new THREE.ShaderMaterial({
       vertexShader: VS, fragmentShader: AUX_FS, depthTest: false, depthWrite: false,
@@ -141,9 +141,9 @@ const GradeShader = {
 };
 
 export class Pipeline {
-  constructor(renderer, scene, camera) {
+  constructor(renderer, scene, camera, samples = 4) {
     this.composer = new EffectComposer(renderer);
-    this.scenePass = new ScenePass(scene, camera); this.composer.addPass(this.scenePass);
+    this.scenePass = new ScenePass(scene, camera, samples); this.composer.addPass(this.scenePass);
     this.bloom = new UnrealBloomPass(new THREE.Vector2(256, 256), 0.8, 0.75, 0.95); this.composer.addPass(this.bloom);
     this.grade = new ShaderPass(GradeShader); this.composer.addPass(this.grade);
     this.composer.addPass(new OutputPass());

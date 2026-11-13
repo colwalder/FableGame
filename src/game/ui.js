@@ -33,7 +33,7 @@ export class UI {
   say(text, dur = 4, demon = false) { const s = this.el.say; s.textContent = text; s.classList.toggle('demon', demon); s.classList.add('on'); this.sayT = dur; }
   area(title, sub) { this.el.areaTitle.textContent = title; this.el.areaSub.textContent = sub || ''; this.el.area.classList.add('on'); this.areaT = 4.5; }
   banner(title, sub, dur = 5) { this.el.bannerTitle.textContent = title; this.el.bannerSub.textContent = sub || ''; this.el.banner.classList.add('on'); this.bannerT = dur; }
-  prompt(text) { if (text === this.promptText) return; this.promptText = text; this.el.prompt.classList.toggle('hidden', !text); if (text) this.el.prompt.innerHTML = `<span class="key">E</span> &nbsp;${text}`; }
+  prompt(text) { if (text === this.promptText) return; this.promptText = text; this.el.prompt.classList.toggle('hidden', !text); document.body.classList.toggle('canuse', !!text); if (text) this.el.prompt.innerHTML = `<span class="key kbd">E</span><span class="tch">Tap</span> &nbsp;${text}`; }
   boss(name, frac) {
     const e = this.el; e.boss.classList.toggle('hidden', !name);
     if (name) { if (e.bossName.textContent !== name) e.bossName.textContent = name; e.bossFill.style.transform = e.bossLag.style.transform = `scaleX(${Math.max(0, frac)})`; }

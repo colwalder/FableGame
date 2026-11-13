@@ -10,7 +10,7 @@ in code at runtime (Three.js + WebAudio). No build step, no asset files.
 python3 serve.py
 ```
 
-Then open http://localhost:5173 in a desktop browser (Chrome recommended).
+Then open http://localhost:5173 in a browser (Chrome recommended).
 
 ## Controls
 
@@ -26,6 +26,11 @@ Then open http://localhost:5173 in a desktop browser (Chrome recommended).
 | Play flute | F | Y |
 | Interact / read | E | A |
 | Journal | Tab | Back |
+
+On a phone or tablet, hold the device sideways: the left thumb moves (push the stick
+past its ring to sprint), the right thumb drags to look, and on-screen buttons cover
+strike, whirl, roll, lock, flask, flute and journal. Tap a prompt to read or rest.
+Add `?touch=1` to the URL to try the touch layout on a desktop.
 
 ## Notes
 

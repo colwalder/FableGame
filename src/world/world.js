@@ -10,8 +10,8 @@ const G1 = C(0x30351f), G2 = C(0x1b1f15), MUD = C(0x2b2119), CORR = C(0x130b10),
 const FOG_A = C(0x0b1118), FOG_B = C(0x1a0a0a);
 
 export class World {
-  constructor(scene) {
-    this.scene = scene;
+  constructor(scene, lite = false) {
+    this.scene = scene; this.lite = lite;
     this.circles = []; this.boxes = []; this.rings = [];
     this.lights = []; this.dyn = []; this.emitters = []; this.interact = []; this.spawns = []; this.shrines = []; this.listen = [];
     this.mats = makeMaterials(); this.batch = new Batch(); this.hs = 1; this.pulse = 0; this.fogColor = new THREE.Color();
@@ -425,7 +425,7 @@ export class World {
           float gust = sin(wind * 1.6 + ip.x * .31 + ip.y * .23) + .5 * sin(wind * 3.7 + ip.x * 1.3 - ip.y * .9) + .6 * sin(wind * .5 + ip.y * .07);
           transformed.xz += tipW * tipW * vec2(.16, .09) * gust;`);
     };
-    const N = 64000, im = new THREE.InstancedMesh(g, gmat, N);
+    const N = this.lite ? 26000 : 64000, im = new THREE.InstancedMesh(g, gmat, N);
     const m = new THREE.Matrix4(), q = new THREE.Quaternion(), c = new THREE.Color(), dead = C(0x5a5a34), dry = C(0x7a6e3c), sick = C(0x2a1c22), wheat = C(0x857238);
     let n = 0;
     for (let i = 0; i < 260000 && n < N; i++) {

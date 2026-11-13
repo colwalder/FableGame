@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { Pipeline } from './gfx/post.js';
 import { Input, KEY } from './core/input.js';
+import { TouchControls } from './core/touch.js';
 import { AudioSys } from './audio/audio.js';
 import { Music } from './audio/music.js';
 import { Ambience } from './audio/ambience.js';
@@ -17,10 +18,20 @@ import { clamp, damp, dampAngle, angDiff, rand } from './core/util.js';
 
 const MOON = new THREE.Vector3(-0.45, 0.55, 0.7).normalize(), RIFT = new THREE.Vector3(0, 0.5, -1).normalize();
 const _v = new THREE.Vector3();
+// the same hints, for thumbs
+const TOUCH_HINTS = {
+  move: 'Left thumb moves  ·  Right thumb looks  ·  Push the stick further to sprint',
+  flute: '♫ — play your flute. The old song lends strength, but you are defenceless while you play.',
+  fight: 'Strike  ·  Whirl  ·  Roll  ·  Lock',
+  flask: 'Tap the flask to drink',
+  graves: 'The air here feels like a held breath…  (♫)',
+};
 
 class Game {
   constructor() {
     const canvas = document.getElementById('game');
+    // phones and tablets get a lighter frame: less multisampling, a smaller shadow map, thinner grass
+    const lite = this.lite = matchMedia('(pointer: coarse)').matches || /[?&]lite=1/.test(location.search);
     const r = this.renderer = new THREE.WebGLRenderer({ canvas, antialias: true, powerPreference: 'high-performance' });
     r.setPixelRatio(Math.min(devicePixelRatio, 1.5)); r.shadowMap.enabled = true; r.shadowMap.type = THREE.PCFSoftShadowMap;
     r.toneMapping = THREE.ACESFilmicToneMapping; r.toneMappingExposure = 1.75;
@@ -28,15 +39,15 @@ class Game {
     this.camera = new THREE.PerspectiveCamera(58, 1, 0.2, 900);
     this.scene.add(new THREE.HemisphereLight(0x7890c4, 0x2a221c, 1.45));
     this.moon = new THREE.DirectionalLight(0xa9bdf0, 2.6); this.moon.castShadow = true;
-    const s = this.moon.shadow; s.mapSize.set(4096, 4096); s.camera.left = s.camera.bottom = -40; s.camera.right = s.camera.top = 40; s.camera.near = 1; s.camera.far = 230; s.bias = -0.0006; s.normalBias = 0.05;
+    const s = this.moon.shadow; s.mapSize.set(lite ? 2048 : 4096, lite ? 2048 : 4096); s.camera.left = s.camera.bottom = -40; s.camera.right = s.camera.top = 40; s.camera.near = 1; s.camera.far = 230; s.bias = -0.0006; s.normalBias = 0.05;
     this.scene.add(this.moon, this.moon.target);
     this.fill = new THREE.PointLight(0x93a8d8, 14, 15, 1.5); this.scene.add(this.fill);
 
-    this.post = new Pipeline(r, this.scene, this.camera); this.grade = this.post.grade;
+    this.post = new Pipeline(r, this.scene, this.camera, lite ? 2 : 4); this.grade = this.post.grade;
     this.post.sources.push({ dir: RIFT, strength: 1 }, { dir: MOON, strength: 0.5 });
 
-    this.input = new Input(canvas);
-    this.world = new World(this.scene); this.world.bakeEnv(r); this.scene.environmentIntensity = 1.0;
+    this.input = new Input(canvas); this.touch = new TouchControls(this.input);
+    this.world = new World(this.scene, lite); this.world.bakeEnv(r); this.scene.environmentIntensity = 1.0;
     this.fx = new FX(this.scene);
     this.ui = new UI(this);
     this.haz = new Hazards(this);
@@ -66,8 +77,9 @@ class Game {
 
   start() {
     if (this.state !== 'title') return;
-    this.audio = new AudioSys(); this.audio.resume(); this.music = new Music(this.audio); this.music.setState('explore'); this.amb = new Ambience(this.audio);
-    this.ui.hideTitle(); this.ui.showHud(true); this.state = 'play'; this.input.wantLock = true; this.input.lock();
+    this.audio = new AudioSys(this.lite); this.audio.resume(); this.music = new Music(this.audio); this.music.setState('explore'); this.amb = new Ambience(this.audio);
+    this.ui.hideTitle(); this.ui.showHud(true); this.state = 'play'; this.touch.immerse();
+    if (!this.touch.enabled) { this.input.wantLock = true; this.input.lock(); }
     this.ui.fade(true); setTimeout(() => this.ui.fade(false), 60);
     this.after(1.2, () => this.ui.area(AREAS[0].title, AREAS[0].sub)); this.seenAreas.add('road');
     this.after(6.5, () => this.ui.say('“Three hundred grivnas. I have walked into worse places for less.”', 5));
@@ -75,7 +87,7 @@ class Game {
     this.after(40, () => { if (this.player.buff <= 0) this.hint('flute', 'F — play your flute. The old song lends strength, but you are defenceless while you play.'); });
   }
   after(sec, fn) { this.timers.push({ t: sec, fn }); }
-  hint(id, text) { if (this.hints.has(id)) return; this.hints.add(id); this.ui.toast(text, 6); }
+  hint(id, text) { if (this.hints.has(id)) return; this.hints.add(id); this.ui.toast((this.touch.enabled && TOUCH_HINTS[id]) || text, 6); }
 
   // ---------- services used by actors ----------
   targets() { return this._targets; }
@@ -158,13 +170,13 @@ class Game {
     if (!this.priest.dead) { this.priest.reset(); this.world.setBarrier('door', !this.templar.dead); for (const l of this.world.lights) if (l._c) { l.color = l._c; l.i = l._i; l._c = 0; } }
   }
 
-  read(id) { this.state = 'read'; this.ui.openReader(id); this.ui.clues(this.found.size - 1); this.audio.sfx.page(); this.ui.prompt(null); }
+  read(id) { this.touch.reset(); this.state = 'read'; this.ui.openReader(id); this.ui.clues(this.found.size - 1); this.audio.sfx.page(); this.ui.prompt(null); }
   rest(s) {
     const p = this.player;
     if (!s.lit) { this.world.lightShrine(s); this.audio.sfx.kindle(); this.ui.banner('SHRINE KINDLED', 'The dark steps back a pace.', 3); }
     this.checkpoint = { x: s.x + Math.sin(s.rot) * 1.6, z: s.z + Math.cos(s.rot) * 1.6, yaw: s.rot + Math.PI };
     p.restore(); p.state = 'rest'; p.lock = null; p.vel.set(0, 0, 0); this.resetWorld();
-    this.state = 'shrine'; this.ui.openShrine(); this.ui.prompt(null);
+    this.touch.reset(); this.state = 'shrine'; this.ui.openShrine(); this.ui.prompt(null);
   }
 
   // ---------- main loop ----------
@@ -224,7 +236,7 @@ class Game {
     this.ambient(dt, p.pos.x, p.pos.z);
     this.ui.frame(dt);
     if (inp.hit(KEY.god) && !p.dead && this.state === 'play') { this.god = !this.god; if (this.god) p.restore(); this.ui.toast(this.god ? 'GOD MODE ON' : 'GOD MODE OFF', 2); }
-    if (inp.hit(KEY.journal) && !p.dead && this.state === 'play') { this.state = 'journal'; this.ui.openJournal(this.found); }
+    if (inp.hit(KEY.journal) && !p.dead && this.state === 'play') { this.touch.reset(); this.state = 'journal'; this.ui.openJournal(this.found); }
   }
 
   ambient(dt, x, z) {

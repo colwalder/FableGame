@@ -122,3 +122,68 @@ button:hover { background: rgba(160,30,20,.7); box-shadow: 0 0 30px rgba(160,30,
 .endtitle.bad { color: #a31d14; text-shadow: 0 0 30px #4a0805; }
 .endbody { font-size: 21px; line-height: 1.6; white-space: pre-line; text-align: left; color: rgba(230,220,200,.92); }
 .endstats { margin-top: 26px; font-family: var(--serif); letter-spacing: .12em; font-size: 14px; color: rgba(216,205,184,.6); }
+
+/* ---------- Touch ---------- */
+.tch { display: none; }
+#touch, #rotate, .xclose { display: none; }
+body.touch { touch-action: none; overscroll-behavior: none; -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; }
+body.touch .kbd, body.touch #belt .key { display: none; }
+body.touch span.tch { display: inline; }
+body.touch .controls.tch { display: grid; }
+body.touch #touch { display: block; position: fixed; inset: 0; z-index: 5; touch-action: none; }
+body.touch #hud.hidden ~ #touch { display: none; }
+
+#stick { position: absolute; width: 132px; height: 132px; margin: -66px 0 0 -66px; border-radius: 50%; border: 1px solid rgba(216,205,184,.3); background: radial-gradient(circle, rgba(8,6,6,.1), rgba(8,6,6,.42)); opacity: 0; transition: opacity .15s, border-color .15s; pointer-events: none; }
+#stick.on { opacity: 1; }
+#stick.sprint { border-color: var(--gold); box-shadow: 0 0 18px rgba(201,164,90,.35); }
+#stickKnob { position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%; background: rgba(216,205,184,.3); border: 1px solid rgba(216,205,184,.6); }
+
+.tbtn { position: absolute; display: flex; align-items: center; justify-content: center; border-radius: 50%; border: 1px solid rgba(216,205,184,.4); background: rgba(8,6,6,.5); color: rgba(216,205,184,.9);
+  font-family: var(--serif); font-size: 11px; letter-spacing: .1em; text-transform: uppercase; text-shadow: 0 0 6px #000; transition: background .08s, transform .08s; }
+.tbtn.on { background: rgba(142,27,20,.65); border-color: #c0392b; transform: scale(.93); }
+.tbtn .ico { pointer-events: none; }
+#tbAttack { right: calc(22px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom)); width: 88px; height: 88px; font-size: 13px; border-color: rgba(192,57,43,.8); }
+#tbRoll   { right: calc(124px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); width: 66px; height: 66px; }
+#tbHeavy  { right: calc(100px + env(safe-area-inset-right)); bottom: calc(98px + env(safe-area-inset-bottom)); width: 66px; height: 66px; }
+#tbLock   { right: calc(22px + env(safe-area-inset-right)); bottom: calc(128px + env(safe-area-inset-bottom)); width: 56px; height: 56px; }
+#tbFlask  { right: calc(204px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom)); width: 54px; height: 54px; }
+#tbFlute  { right: calc(180px + env(safe-area-inset-right)); bottom: calc(90px + env(safe-area-inset-bottom)); width: 54px; height: 54px; }
+#tbJournal { right: calc(18px + env(safe-area-inset-right)); top: calc(14px + env(safe-area-inset-top)); width: auto; height: 34px; padding: 0 14px; border-radius: 17px; }
+/* an invisible hit area laid exactly over the interaction prompt */
+#tbUse { display: none; left: 50%; bottom: calc(30% - 12px); width: 300px; height: 64px; margin-left: -150px; border: 0; background: none; border-radius: 0; }
+body.canuse #tbUse { display: block; }
+
+body.touch #bars { left: calc(20px + env(safe-area-inset-left)); top: calc(16px + env(safe-area-inset-top)); }
+body.touch .bar { max-width: 38vw; }
+body.touch #belt { left: calc(20px + env(safe-area-inset-left)); top: calc(58px + env(safe-area-inset-top)); bottom: auto; gap: 8px; }
+body.touch #belt .slot { padding: 4px 9px; font-size: 15px; }
+body.touch #belt .slot:nth-child(2) { display: none; }
+body.touch #buff { position: absolute; left: 0; top: 78px; white-space: nowrap; }
+body.touch #clueCount { right: calc(118px + env(safe-area-inset-right)); top: calc(24px + env(safe-area-inset-top)); bottom: auto; }
+body.touch #boss { bottom: calc(14px + env(safe-area-inset-bottom)); width: 34vw; }
+body.touch #bossName { font-size: 13px; margin-bottom: 3px; }
+body.touch #prompt { border-color: var(--gold); box-shadow: 0 0 16px rgba(201,164,90,.3); }
+body.touch .xclose { display: flex; position: absolute; right: calc(16px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); width: 44px; height: 44px; align-items: center; justify-content: center; border-radius: 50%;
+  border: 1px solid rgba(216,205,184,.45); background: rgba(8,6,6,.7); font-size: 18px; color: var(--bone); z-index: 2; }
+body.touch .srow { padding: 13px 4px; }
+body.touch .jitem { padding: 12px 18px; }
+body.touch .overlay { overflow: auto; }
+
+/* short landscape screens: everything tightens */
+@media (max-height: 520px) {
+  #area { top: 40%; } #areaTitle { font-size: 28px; } #areaTitle::after { width: 220px; margin: 8px auto; } #areaSub { font-size: 15px; }
+  #bannerTitle { font-size: 30px; } #banner { padding: 14px 0; } #bannerSub { font-size: 15px; }
+  #say { font-size: 17px; bottom: 34%; } #toast { font-size: 13px; top: 20%; max-width: 46vw; }
+  #prompt { font-size: 14px; } #death div { font-size: 34px; }
+  .tsup { font-size: 10px; } h1 { margin: 6px 0 2px; font-size: clamp(26px, 6vw, 44px); } .tline { margin: 6px auto 8px; }
+  .tintro { font-size: 14px; margin: 6px 0; } button { margin: 10px 0 12px; padding: 10px 34px; font-size: 15px; }
+  .controls { font-size: 12px; gap: 3px 18px; } .tfoot { display: none; }
+  .parchment { padding: 20px 28px 14px; max-height: 92vh; } .ptitle { font-size: 17px; margin-bottom: 10px; padding-bottom: 8px; } .pbody { font-size: 16px; } .pnote { font-size: 14px; margin-top: 10px; } .phint { margin-top: 12px; }
+  .jwrap { max-height: 92vh; gap: 12px; } .jlist { width: 200px; padding: 6px 0; } .jitem { font-size: 12px; }
+  .shrinebox { padding: 16px 28px 12px; } .stitle { font-size: 19px; } .ssub { margin: 2px 0 8px; font-size: 14px; } .srow { font-size: 15px; } .ssilver { margin-top: 8px; }
+  .endtitle { font-size: 28px; margin: 6px 0 12px; } .endbody { font-size: 15px; line-height: 1.45; } .endstats { margin-top: 12px; font-size: 11px; }
+  .endbox { max-height: 96vh; overflow: auto; }
+}
+@media (orientation: portrait) {
+  body.touch #rotate { display: flex; position: fixed; inset: 0; z-index: 50; align-items: center; justify-content: center; background: #050506; font-family: var(--serif); font-size: 20px; letter-spacing: .14em; text-align: center; color: var(--bone); }
+}

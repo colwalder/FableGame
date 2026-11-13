@@ -66,7 +66,8 @@ export function fluteNote(sys, t, midi, dur, dest, vol = 0.3) {
 }
 
 export class AudioSys {
-  constructor() {
+  constructor(lite = false) {
+    this.lite = lite;                                   // phones: cheaper panning
     const c = this.ctx = new (window.AudioContext || window.webkitAudioContext)();
     this.master = c.createGain(); this.master.gain.value = 0.9;
     const lo = c.createBiquadFilter(); lo.type = 'lowshelf'; lo.frequency.value = 110; lo.gain.value = 2.5;
@@ -121,7 +122,7 @@ export class AudioSys {
   }
   panner(x, y, z, ref = 5, roll = 0.7) {
     const p = this.ctx.createPanner();
-    p.panningModel = 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = ref; p.rolloffFactor = roll; p.maxDistance = 120;
+    p.panningModel = this.lite ? 'equalpower' : 'HRTF'; p.distanceModel = 'inverse'; p.refDistance = ref; p.rolloffFactor = roll; p.maxDistance = 120;
     if (p.positionX) { p.positionX.value = x; p.positionY.value = y; p.positionZ.value = z; } else p.setPosition(x, y, z);
     return p;
   }

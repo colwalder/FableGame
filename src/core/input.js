@@ -1,4 +1,4 @@
-// Keyboard, mouse (pointer lock) and gamepad, unified into "codes" you can query.
+// Keyboard, mouse (pointer lock), gamepad and touch, unified into "codes" you can query.
 const PAD_NAMES = ['PadA', 'PadB', 'PadX', 'PadY', 'PadLB', 'PadRB', 'PadLT', 'PadRT', 'PadBack', 'PadStart', 'PadL3', 'PadR3', 'PadUp', 'PadDown', 'PadLeft', 'PadRight'];
 
 export const KEY = {
@@ -25,6 +25,7 @@ export class Input {
     this.wantLock = false;
     this.padAxes = [0, 0, 0, 0];
     this.padPrev = new Set();
+    this.touchAxes = [0, 0];
 
     addEventListener('keydown', (e) => {
       if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.code)) e.preventDefault();
@@ -44,6 +45,11 @@ export class Input {
     document.addEventListener('pointerlockchange', () => { this.locked = document.pointerLockElement === el; });
     addEventListener('blur', () => this.keys.clear());
   }
+
+  // virtual keys, for on-screen controls
+  press(code) { this.keys.add(code); this.pressed.add(code); }
+  release(code) { this.keys.delete(code); }
+  tap(code) { this.pressed.add(code); }
 
   lock() {
     try { const p = this.el.requestPointerLock && this.el.requestPointerLock(); if (p && p.catch) p.catch(() => {}); } catch (e) { /* ignore */ }
@@ -77,8 +83,8 @@ export class Input {
   hit(codes) { for (const c of codes) if (this.pressed.has(c)) return true; return false; }
   /** Movement axis: x = right, y = forward. */
   axis() {
-    let x = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0) + this.padAxes[0];
-    let y = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0) - this.padAxes[1];
+    let x = (this.keys.has('KeyD') ? 1 : 0) - (this.keys.has('KeyA') ? 1 : 0) + this.padAxes[0] + this.touchAxes[0];
+    let y = (this.keys.has('KeyW') ? 1 : 0) - (this.keys.has('KeyS') ? 1 : 0) - this.padAxes[1] + this.touchAxes[1];
     const l = Math.hypot(x, y);
     if (l > 1) { x /= l; y /= l; }
     return { x, y };
