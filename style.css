@@ -167,7 +167,14 @@ body.touch .xclose { display: flex; position: absolute; right: calc(16px + env(s
   border: 1px solid rgba(216,205,184,.45); background: rgba(8,6,6,.7); font-size: 18px; color: var(--bone); z-index: 2; }
 body.touch .srow { padding: 13px 4px; }
 body.touch .jitem { padding: 12px 18px; }
-body.touch .overlay { overflow: auto; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+html.touch, body.touch, body.touch canvas, body.touch #touch, body.touch #touch *, body.touch #hud, body.touch #rotate { touch-action: none; }
+body.touch .overlay, body.touch .parchment, body.touch .jlist, body.touch .titlebox, body.touch .endbox { overflow: auto; touch-action: pan-y; }
+body.touch .tbtn, body.touch .xclose, body.touch .srow, body.touch .jitem, body.touch button { touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+/* if a zoom ever gets through, give the browser its gestures back so two fingers can undo it */
+html.touch:has(body.zoomed), body.touch.zoomed, body.touch.zoomed * { touch-action: pinch-zoom pan-x pan-y !important; }
+#unzoom { position: fixed; left: 50%; top: calc(10px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 60; padding: 8px 16px; font-family: var(--serif); font-size: 13px; letter-spacing: .08em;
+  color: var(--bone); background: rgba(8,6,6,.85); border: 1px solid var(--gold); pointer-events: none; white-space: nowrap; }
 
 /* short landscape screens: everything tightens */
 @media (max-height: 520px) {

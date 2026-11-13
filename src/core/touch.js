@@ -17,7 +17,7 @@ export class TouchControls {
 
   enable() {
     if (this.enabled) return; this.enabled = true;
-    document.body.classList.add('touch');
+    document.body.classList.add('touch'); document.documentElement.classList.add('touch');
     const L = this.layer;
     L.addEventListener('pointerdown', (e) => this.down(e));
     L.addEventListener('pointermove', (e) => this.move(e));
@@ -25,9 +25,33 @@ export class TouchControls {
     L.addEventListener('contextmenu', (e) => e.preventDefault());
     // close buttons and tap-to-dismiss inside the overlays
     document.querySelectorAll('[data-tap]').forEach((el) => el.addEventListener('click', (e) => { e.stopPropagation(); this.input.tap(el.dataset.tap); }));
-    // stop the page itself from scrolling, zooming or rubber-banding under the game
-    document.addEventListener('touchmove', (e) => { if (!e.target.closest('.parchment, .jlist, .titlebox, .endbox')) e.preventDefault(); }, { passive: false });
-    document.addEventListener('gesturestart', (e) => e.preventDefault());
+    // ---- keep iOS from zooming the page ----
+    // iOS Safari ignores user-scalable=no, and cancelling pointer events does not cancel the touch
+    // behind them, so fast taps read as double-tap-to-zoom and a tap while the other thumb holds the
+    // stick can read as a pinch. Every guard below stands down while the page is already zoomed,
+    // so whatever got through, two fingers can always pinch back out.
+    const vv = window.visualViewport, zoomed = () => !!vv && vv.scale > 1.02;
+    const scrollable = (t) => t && t.closest && t.closest('.parchment, .jlist, .titlebox, .endbox');
+    const block = (e) => { if (!zoomed() && e.cancelable) e.preventDefault(); };
+    // the control layer only listens for pointer events, so nothing on it needs the touch defaults
+    for (const ev of ['touchstart', 'touchmove', 'touchend']) L.addEventListener(ev, block, { passive: false });
+    // anywhere: a second finger never starts a gesture, and nothing pans except the scrolling text
+    document.addEventListener('touchstart', (e) => { if (e.touches.length > 1) block(e); }, { passive: false });
+    document.addEventListener('touchmove', (e) => { if (e.touches.length > 1 || !scrollable(e.target)) block(e); }, { passive: false });
+    // menus: swallow the second tap of a quick pair (taps on the controls don't arm this)
+    let lastEnd = 0;
+    document.addEventListener('touchend', (e) => {
+      if (L.contains(e.target)) return;
+      const t = performance.now(); if (t - lastEnd < 380 && e.touches.length === 0) block(e); lastEnd = t;
+    }, { passive: false });
+    for (const ev of ['gesturestart', 'gesturechange', 'gestureend']) document.addEventListener(ev, block, { passive: false });
+    document.addEventListener('dblclick', block, { passive: false });
+    // while zoomed, lift the CSS lock too and say how to get back
+    if (vv) vv.addEventListener('resize', () => {
+      const z = zoomed(); if (z === document.body.classList.contains('zoomed')) return;
+      document.body.classList.toggle('zoomed', z);
+      document.getElementById('unzoom').classList.toggle('hidden', !z);
+    });
   }
 
   /** Ask for fullscreen landscape where the browser allows it (called from the start tap). */
